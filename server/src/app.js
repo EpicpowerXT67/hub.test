@@ -10,6 +10,7 @@ const app = express();
 // 1. Global middleware
 const allowedOrigins = [
   process.env.CLIENT_ORIGIN,
+  process.env.FRONTEND_URL,
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
@@ -24,7 +25,7 @@ const allowedOrigins = [
   "http://0.0.0.0:4173",
 ].filter(Boolean);
 
-const isLocalDevOrigin = (origin) => {
+const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
   try {
@@ -32,9 +33,11 @@ const isLocalDevOrigin = (origin) => {
     const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
     const isLocalHost = localHosts.has(hostname);
     const isLocalNetwork = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
+    const isVercelDomain = hostname.endsWith(".vercel.app");
+    const isVercelPreview = hostname.includes("-git-") || hostname.includes("-preview-") || hostname.includes("-local");
     const allowedPort = ["5173", "5174", "5175", "4173", "3000", "8080"].includes(port) || !port;
 
-    return allowedOrigins.includes(origin) || (isLocalHost || isLocalNetwork) && allowedPort;
+    return allowedOrigins.includes(origin) || (isLocalHost || isLocalNetwork) && allowedPort || isVercelDomain || isVercelPreview;
   } catch {
     return false;
   }
@@ -42,7 +45,7 @@ const isLocalDevOrigin = (origin) => {
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (isLocalDevOrigin(origin)) return callback(null, true);
+    if (isAllowedOrigin(origin)) return callback(null, true);
     callback(new Error("Origin not allowed by CORS"));
   },
   credentials: true,

@@ -46,6 +46,8 @@ const characterSchema = new mongoose.Schema(
       fileName: { type: String },
       mimeType: { type: String },
       summary: { type: String, maxlength: 12000 },
+      url: { type: String },
+      key: { type: String },
       uploadedAt: { type: Date },
     },
     isActive: { type: Boolean, default: true },

@@ -323,13 +323,30 @@ const uploadSheet = async (req, res, next) => {
     if (isImage) {
       return res.status(400).json({ message: `${AI_MODEL} does not support image character sheets. Upload a text-based PDF, TXT, or JSON file.` });
     }
+
+    let uploadedFile = null;
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const safeFileName = req.file.originalname.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9._-]/g, "-");
+      uploadedFile = await put(`character-sheets/${character._id}/${Date.now()}-${safeFileName}`, req.file.buffer, {
+        access: "public",
+        contentType: req.file.mimetype,
+      });
+    }
+
     let sheetText = "";
     if (req.file.mimetype === "application/pdf") sheetText = (await pdf(req.file.buffer)).text;
     else sheetText = req.file.buffer.toString("utf8");
     if (!sheetText.trim()) return res.status(400).json({ message: "No readable text found. Upload a text-based PDF, TXT, or JSON file." });
     const userMessage = { role: "user", content: `<CHARACTER_SHEET>\n${sheetText.slice(0, 12000)}\n</CHARACTER_SHEET>` };
     const summary = await callAI([{ role: "system", content: sheetInstructions }, userMessage], { temperature: 0.1, topP: 0.8, numPredict: 900 });
-    character.sheet = { fileName: req.file.originalname, mimeType: req.file.mimetype, summary, uploadedAt: new Date() };
+    character.sheet = {
+      fileName: uploadedFile?.filename || req.file.originalname,
+      mimeType: req.file.mimetype,
+      summary,
+      url: uploadedFile?.url || undefined,
+      key: uploadedFile?.pathname || undefined,
+      uploadedAt: new Date(),
+    };
     await character.save();
     res.json({ character });
   } catch (error) { next(error); }
