@@ -1,0 +1,27 @@
+# Local secrets and environment-specific settings
+.env
+.env.*
+.env.*.local
+!.env.example
+**/.env
+**/.env.*
+**/.env.*.local
+!**/.env.example
+
+# Dependencies and generated files
+node_modules/
+dist/
+coverage/
+.vercel/
+
+# Uploaded files (ignore all media by default, but keep placeholder files)
+uploads/**
+!uploads/**/.gitkeep
+
+# Explicitly ignore common generated folders anywhere in the repo
+**/node_modules/
+**/dist/
+**/.vercel/
+**/.env
+**/.env.*
+**/.env.*.local
