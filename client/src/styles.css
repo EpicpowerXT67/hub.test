@@ -328,7 +328,7 @@ html, body {
   content: "";
   position: absolute;
   inset: -20px;
-  background-image: url("./assets/tavern-bg.jpg");
+  background-image: url("/tavern-bg.jpg");
   background-size: cover;
   background-position: center;
   filter: blur(7px) brightness(0.65);
