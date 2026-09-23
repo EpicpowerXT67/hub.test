@@ -1,0 +1,13 @@
+Test Character Sheet
+
+Name: Trial Hero
+Class: Fighter
+Race: Human
+Background: Adventurer
+
+Strength: 16
+Dexterity: 12
+Constitution: 14
+Intelligence: 10
+Wisdom: 11
+Charisma: 13

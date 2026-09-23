@@ -18,6 +18,8 @@
 html, body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
+  background: var(--ink);
   font-family: "Inter", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -89,27 +91,49 @@ html, body {
 
 .chat-rpg {
   height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
   background: var(--ink);
   color: var(--parchment);
+  overflow: hidden;
 }
 .chat-rpg.sidebar-on {
-  grid-template-columns: 272px 1fr;
+  display: flex;
 }
 @media (max-width: 780px) {
-  .chat-rpg.sidebar-on { grid-template-columns: 1fr; }
+  .chat-rpg.sidebar-on { display: flex; }
 }
 
 .chat-sidebar {
+  width: 280px;
   background: var(--panel);
   color: var(--parchment);
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
-  gap: 16px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
   border-right: 1px solid var(--line);
+  min-height: 0;
+  height: 100%;
+  flex-shrink: 0;
+  transition: width 0.3s ease;
+}
+.chat-sidebar.collapsed {
+  width: 0;
+}
+.chat-sidebar-inner {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 12px;
+  min-height: 0;
+  overflow-y: auto;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+.chat-sidebar.collapsed .chat-sidebar-inner {
+  opacity: 0;
+  pointer-events: none;
 }
 .chat-side-top {
   display: flex;
@@ -154,6 +178,22 @@ html, body {
   cursor: pointer;
   padding: 0 6px;
   text-align: left;
+  outline: none;
+}
+
+.new-campaign-form {
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .chat-campaign-form, .chat-character-add {
@@ -272,15 +312,45 @@ html, body {
   font-size: 12px;
 }
 
-.chat-main { display: flex; flex-direction: column; min-width: 0; }
+.chat-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  flex: 1;
+  background: rgba(14, 10, 8, 0.64);
+}
+
+.chat-main::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  background-image: url("./assets/tavern-bg.jpg");
+  background-size: cover;
+  background-position: center;
+  filter: blur(7px) brightness(0.65);
+  transform: scale(1.05);
+  z-index: 0;
+}
+
+.chat-main > * {
+  position: relative;
+  z-index: 1;
+}
 
 .chat-main-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
+  border-bottom: 1px solid rgba(169, 138, 75, 0.25);
+  background: transparent;
+  backdrop-filter: blur(2px);
 }
 .chat-main-header button:first-child {
   background: none;
