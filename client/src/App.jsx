@@ -40,7 +40,7 @@ function Auth({ onAuthenticated }) {
     <main className="min-h-screen grid lg:grid-cols-2 bg-[#f1e4cd]">
       <section className="hidden lg:flex relative overflow-hidden flex-col justify-between p-16 text-[#f7e6c1] bg-[#271116]">
         <div className="absolute inset-5 border border-amber-300/30" />
-        <p className="font-display text-lg z-10">⚄ PortAbleTrack</p>
+        <p className="font-display text-lg z-10">⚄ Adventure Journey</p>
         <div className="z-10 max-w-2xl">
           <p className="eyebrow">THE ADVENTURER'S LEDGER</p>
           <h1 className="font-display text-6xl leading-tight">
@@ -261,7 +261,7 @@ function ChatRpgDashboard({ session, campaigns, setCampaigns, selected, setSelec
   return <main className={`chat-rpg ${sidebarOpen ? "sidebar-on" : ""}`}>
     <aside className={`chat-sidebar ${sidebarOpen ? "" : "collapsed"}`}>
       <div className="chat-sidebar-inner">
-        <div className="chat-side-top"><b>⚄ PortAbleTrack</b><button onClick={() => setSidebarOpen(false)} title="Hide sidebar">◧</button></div>
+        <div className="chat-side-top"><b>⚄ Adventure Journey</b><button onClick={() => setSidebarOpen(false)} title="Hide sidebar">◧</button></div>
         <button className="new-table" onClick={toggleNewCampaignForm}>＋ New campaign</button>
         <section className="side-section"><button className="side-section-title" onClick={() => setCampaignsOpen((open) => !open)}>⌄</button>{campaignsOpen && <>
           {showNewCampaignForm && (
@@ -281,7 +281,7 @@ function ChatRpgDashboard({ session, campaigns, setCampaigns, selected, setSelec
       </div>
     </aside>
     <section className="chat-main">
-      <header className="chat-main-header">{!sidebarOpen && <button onClick={() => setSidebarOpen(true)}>☰</button>}<div>{selected ? <><b>{selected.campaign.name}</b><small>{selected.campaign.settings.system} · AI Dungeon Master</small></> : <b>PortAbleTrack</b>}</div>{selected && <button className="delete-chat" onClick={removeCampaign}>Delete</button>}</header>
+      <header className="chat-main-header">{!sidebarOpen && <button onClick={() => setSidebarOpen(true)}>☰</button>}<div>{selected ? <><b>{selected.campaign.name}</b><small>{selected.campaign.settings.system} · AI Dungeon Master</small></> : <b>Adventure Journey</b>}</div>{selected && <button className="delete-chat" onClick={removeCampaign}>Delete</button>}</header>
       {selected ? <><div className="chat-history">{selected.messages.length === 0 && <div className="chat-welcome"><span>⚄</span><h1 className="empty-state-headline">The table is ready.</h1><p>Describe the opening scene or ask your Dungeon Master to begin.</p></div>}{selected.messages.map((item) => <article key={item._id} className={item.role === "dm" ? "chat-dm-message" : "chat-user-message"}><span>{item.role === "dm" ? "✦ Dungeon Master" : "You"}</span><p>{item.content}</p></article>)}{loading && <article className="chat-dm-message"><span>✦ Dungeon Master</span><p>Consulting the fates…</p></article>}</div><form onSubmit={send} className="chat-input"><input value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Message the Dungeon Master…" /><button disabled={loading}>➤</button></form></> : <div className="chat-welcome"><span className="dice-mark">✦</span><h1 className="empty-state-headline">BEGIN A NEW LEGEND.</h1><p>Open the sidebar and create a campaign to summon your Dungeon Master.</p></div>}
     </section>{error && <p className="rpg-error">{error}</p>}
   </main>;
