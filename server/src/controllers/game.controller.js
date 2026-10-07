@@ -10,10 +10,25 @@ const { findMentionedEntities } = require("../services/srd-lookup.service");
 const AI_MODEL = process.env.OPENTYPHOON_MODEL || "typhoon-v2.5-30b-a3b-instruct";
 const AI_TEMPERATURE = Number(process.env.AI_TEMPERATURE || 0.85);
 const DM_STOP_SEQUENCES = ["\nPLAYER:", "\nPlayer:", "\nผู้เล่น:", "\nYOU:"];
+const SIMILARITY_THRESHOLD = 0.35;
+const NARRATIVE_LOOP_FALLBACK = "สถานการณ์ปัจจุบันยังเปิดกว้าง และไม่มีผลใหม่ใดถูกกำหนดแทนคุณในตอนนี้ DM พร้อมดำเนินเรื่องต่อจากข้อมูลล่าสุดโดยไม่ตัดสินใจแทนตัวละคร คุณจะทำอะไรต่อ?";
+const STOCK_PHRASES = [/คุณจะทำอะไรต่อ[?？。.!…]*/g, /เสียงกระซิบดังขึ้น[^\n]*/g, /ความเงียบ/g];
 const typhoon = new OpenAI({
   apiKey: process.env.OPENTYPHOON_API_KEY,
   baseURL: process.env.OPENTYPHOON_BASE_URL || "https://api.opentyphoon.ai/v1",
 });
+const stripStockPhrases = (text) =>
+  STOCK_PHRASES.reduce((cleaned, phrase) => cleaned.replace(phrase, " "), text || "").replace(/\s+/g, " ").trim();
+const textSimilarity = (a, b) => {
+  const shingles = (text) => new Set(stripStockPhrases(text).match(/.{1,20}/g) || []);
+  const left = shingles(a);
+  const right = shingles(b);
+  if (left.size === 0 || right.size === 0) return 0;
+  const overlap = [...left].filter((shingle) => right.has(shingle)).length;
+  return overlap / Math.max(left.size, right.size);
+};
+const isNarrativeLoop = (draft, recentDmMessages) =>
+  recentDmMessages.some((previous) => textSimilarity(draft, previous.content) > SIMILARITY_THRESHOLD);
 const isMember = (campaign, userId) => campaign.members.some((member) => member.user.equals(userId));
 const outlineInstructions = `Create a flexible long-form D&D campaign outline in Thai for the Dungeon Master. Build a complete story with an opening situation, 5 to 8 major chapters, escalating conflict, important NPCs, locations, secrets, possible endings, and several optional side paths. For every major chapter, include its purpose, clues that lead there, what happens if players ignore it, and at least one natural hook that can bring the party back toward the central conflict. Make the outline resilient to player agency: it must describe goals, tensions, and consequences rather than requiring one exact sequence of actions. Do not write a railroad or force the players to do anything. Keep important mysteries and antagonist plans clear for the DM, but do not reveal this outline directly to players.`;
 const dmInstructions = `You are an open-ended, creative Dungeon Master for a solo D&D 2024 game. Respond in natural Thai unless the player asks for another language.
@@ -75,7 +90,9 @@ const dmSystemPrompt = `คุณคือ Dungeon Master (DM) มืออา�
 - Proficiency Bonus ตามเลเวล: +2 (เลเวล 1-4), +3 (5-8), +4 (9-12), +5 (13-16), +6 (17-20)
 - Action Economy ต่อเทิร์น: 1 Action, 1 Bonus Action (ถ้ามี), Reaction (เมื่อถูกกระตุ้น), Movement ตาม speed, และ Free Object Interaction
 - Combat: ให้ผู้เล่นทอย Initiative เอง (คุณทอยให้ฝั่งศัตรู) แล้วเรียงลำดับเทิร์นตามนั้นเสมอ
-- ทุกครั้งที่ผู้เล่นประกาศจะโจมตี (ต่อย ฟัน แทง ยิง ฯลฯ) ไม่ว่าจะอยู่ในฉากต่อสู้ที่ประกาศ Initiative แล้วหรือไม่ก็ตาม ต้องขอให้ผู้เล่นทอย Attack Roll (d20 + modifier) ก่อนเสมอ ห้ามเล่าผลลัพธ์การโจมตีตรงๆ โดยไม่มีการทอยเต๋าคั่นกลาง
+- ทุกครั้งที่ผู้เล่นประกาศจะโจมตี (ต่อย ฟัน แทง ยิง ฯลฯ) ไม่ว่าจะอยู่ในฉากต่อสู้ที่ประกาศ Initiative แล้วหรือไม่ก็ตาม ให้ขอผู้เล่นทอย Attack Roll (d20 + modifier) แล้วรอผลรวมจากผู้เล่นก่อน ห้ามทอยแทนผู้เล่น ห้ามแต่งผลเต๋า และห้ามบรรยายว่าการโจมตีโดน พลาด ทำความเสียหาย หรือเกิดผลสำเร็จก่อนผู้เล่นส่งผลทอย
+- Attack Roll ต้องนำผลรวมไปเทียบกับ AC ของเป้าหมาย ไม่ใช่ DC ที่ผู้เล่นกำหนด DM เป็นผู้กำหนด AC/DC ที่เหมาะสมจากข้อมูลตัวละครหรือสถานการณ์เอง ผู้เล่นมีหน้าที่รายงานผลทอยเท่านั้น ห้ามขอให้ผู้เล่นตั้งหรือเลือก DC/AC
+- กฎ Attack Roll นี้ใช้แม้ในสถานการณ์ที่ดูเหนือธรรมชาติ เป็นนิมิต หรือดราม่าก็ตาม ห้ามใช้มุก "เวลาหยุดลง" หรือ "ภาพนิมิต" แทนการตัดสินผลการโจมตีด้วยกลไกเกมจริง ทุกการโจมตีต้องขอ Attack Roll และตัดสินผลจริงเสมอ ไม่ว่าเนื้อเรื่องจะดูพิเศษแค่ไหน
 - Critical Hit: ทอยโจมตีได้เลข 20 ธรรมชาติ = โจมตีคริติคอล ทอยจำนวนลูกเต๋าดาเมจเป็นสองเท่า
 - Death Saving Throw: ทอย d20 เมื่อ HP เหลือ 0 — ได้ 10 ขึ้นไป = สำเร็จ, ต่ำกว่า 10 = ล้มเหลว, สำเร็จครบ 3 = เสถียร, ล้มเหลวครบ 3 = ตาย, ทอยได้ 1 = นับล้มเหลว 2 ครั้งรวด, ทอยได้ 20 = ฟื้นทันทีด้วย 1 HP
 - Rest: Short Rest = 1 ชั่วโมง (ใช้ Hit Dice ฟื้น HP ได้), Long Rest = 8 ชั่วโมง (ฟื้น HP เต็มและทรัพยากรส่วนใหญ่)
@@ -146,8 +163,8 @@ const dmSystemPrompt = `คุณคือ Dungeon Master (DM) มืออา�
 
 === ฉากต่อสู้ ===
 - เริ่มด้วยขอให้ผู้เล่นทอย Initiative (คุณทอยให้ศัตรู) แล้วประกาศลำดับเทิร์นให้ชัดเจน
-- เทิร์นศัตรู: บรรยายการกระทำ ทอย attack/damage เอง แล้วบอกผลลัพธ์ที่ชัดเจน
-- เทิร์นผู้เล่น: ถามว่าจะทำอะไร ขอให้ทอย attack/check ที่เกี่ยวข้อง แล้วบรรยายผลอย่างมีสีสันตามที่ทอยได้จริง
+- เทิร์นศัตรู: บรรยายการกระทำ ทอย attack/damage ของศัตรูเอง แล้วบอกผลลัพธ์ที่ชัดเจน
+- เทิร์นผู้เล่น: เมื่อผู้เล่นประกาศการโจมตี ให้ระบุ Attack Roll และรอผลรวมจากผู้เล่น ห้ามสร้างผลทอยของผู้เล่นเอง จากนั้นจึงเทียบกับ AC ที่ DM กำหนดและบรรยายผลตามจริง
 - ติดตาม HP, condition และ resource ของทุกตัวละครในฉากอย่างแม่นยำตลอดการต่อสู้ และแจ้งผู้เล่นทุกครั้งที่มีการเปลี่ยนแปลง (ผ่าน tool update_game_state ตามที่ระบุไว้ข้างต้น)
 
 === อื่นๆ ===
@@ -165,6 +182,26 @@ Correct: "ชาวบ้านเตือนถึงเงาที่เค�
 Do not write "คุณรู้สึก", "คุณคิดว่า", "คุณลังเล", "คุณตัดสินใจ", or equivalent wording unless the player explicitly stated that exact inner state. This final check overrides any generic interactive-fiction convention.`;
 
 const violatesPlayerAgency = (text) => /(^|\n)\s*(?:\d+\.|[A-C][.)])\s+|(^|\n)\s*[-•]\s+(?:เข้า|ไป|กลับ|โจมตี|ฟัน|แทง|ยิง|หนี|คุย|ถาม|สำรวจ|เปิด|ใช้|เลือก|เดิน|ทำ|ลอง|attack|move|cast|run|talk|explore|open|use|choose)\b|คุณรู้สึก|คุณคิดว่า|คุณลังเล|คุณตัดสินใจ|คุณมีทางเลือก|\b(?:you|your)\s+(?:feel|think|decide|choose|brace|tense|ready|body|hands|fists)\b/i.test(text);
+const isPlayerAttackAction = (text) => /โจมตี|ต่อย|ฟัน|แทง|ยิง|\battack(?:s|ed|ing)?\b|\bstrike\b|\bstab\b|\bshoot\b/i.test(text);
+const hasPlayerReportedRoll = (text, recentDmMessages = []) => {
+  if (/(?:ผล(?:จากการ)?ทอย(?:คือ|ได้|เป็น)?|ผลการทอย(?:คือ|ได้|เป็น)?|ทอย(?:ได้|ออก)|ผลรวม(?:คือ|ได้|เป็น)?|คะแนนรวม(?:คือ|ได้|เป็น)?)\s*\d{1,2}\b|(?:\bi rolled\b|\bmy roll\b|\broll result\b|\battack roll total\b)\D{0,12}\d{1,2}\b/i.test(text)) return true;
+  const response = (text || "").trim();
+  const previousDmAskedForRoll = recentDmMessages.some((item) => /\battack roll\b|ทอย.{0,24}(?:โจมตี|attack)|(?:โจมตี|attack).{0,24}ทอย/i.test(item.content));
+  return previousDmAskedForRoll && /^\d{1,2}(?:\s*\+\s*\d{1,2})?$/.test(response);
+};
+const claimsUnprovidedRoll = (answer, playerMessage, recentDmMessages = []) => {
+  if (hasPlayerReportedRoll(playerMessage, recentDmMessages)) return false;
+  return /(?:ผล(?:จากการ)?ทอย(?:คือ|ได้|เป็น)?|ผลการทอย(?:คือ|ได้|เป็น)?|ทอย(?:ได้|ออก)|ผลรวม(?:คือ|ได้|เป็น)?)\s*\d{1,2}\b|\b(?:you rolled|the roll (?:is|was)|roll result(?: is|:)|result of (?:the )?roll(?: is|:))\D{0,12}\d{1,2}\b/i.test(answer);
+};
+const asksPlayerToSetDc = (answer) =>
+  /\b(?:you|player)\s+(?:set|choose|determine)\s+(?:the\s+)?(?:DC|AC)\b|\b(?:DC|AC)\b.{0,20}(?:ที่คุณตั้ง|ให้คุณตั้ง|ให้ผู้เล่นตั้ง)|(?:ให้)?(?:คุณ|ผู้เล่น)\s*(?!ไม่ต้อง|ไม่จำเป็นต้อง|ไม่)(?:ต้อง\s*)?(?:ไป\s*)?(?:ตั้ง|กำหนด|เลือก)\s*(?:ค่า\s*)?\b(?:DC|AC)\b/i.test(answer);
+const asksPlayerForAttackRoll = (answer) =>
+  /\battack roll\b|ทอย.{0,24}(?:โจมตี|attack)|(?:โจมตี|attack).{0,24}ทอย/i.test(answer);
+const claimsPlayerAttackResolved = (answer) =>
+  /(?:คุณ|ตัวละครของคุณ|ดาบของคุณ|อาวุธของคุณ|ลูกธนูของคุณ).{0,80}(?:ฟัน|แทง|โจมตี|ยิง|ปล่อย(?:ลูกธนู|ศร)|เหวี่ยง|สะบัด).{0,40}(?:ลง|เข้า|ใส่|ผ่าน|จน|แล้ว|โดน|พลาด|เป้า|กระแทก|เฉือน|บาด|ทะลุ)|\b(?:you|your sword|your weapon).{0,60}\b(?:strike|slash|stab|shoot|hit|miss|cut|wound|damage)\b/i.test(answer);
+const diceSafetyFallback = (playerMessage) => isPlayerAttackAction(playerMessage)
+  ? "การโจมตียังไม่ได้รับการตัดสินผล กรุณาทอย Attack Roll (d20 + modifier) แล้วส่งผลรวมมาให้ DM ก่อน DM จะเป็นผู้กำหนด AC ที่เหมาะสมของเป้าหมายและบรรยายผลตามผลทอยจริง โดยคุณไม่ต้องตั้ง DC เอง"
+  : "ยังไม่มีผลการทอยจากผู้เล่น จึงยังตัดสินผลไม่ได้ กรุณาทอยตาม check ที่ระบุไว้แล้วส่งผลรวมมาให้ DM ก่อน";
 const violatesLanguagePurity = (text) => text.length > 80 && !/[\u0e00-\u0e7f]/u.test(text);
 const containsCjk = (text) => /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/u.test(text);
 const OOC_KEYWORDS_REGEX = /character\s*sheet|stat\s*block|กฎข้อนี้คืออะไร|บันทึกไว้(หรือยัง)?|save(d)?\s*ไว้|จำได้(มั้ย|ไหม)|DM\s*อ่าน|\bOOC\b/i;
@@ -183,6 +220,9 @@ const repairPlayerAgency = async (answer, reasons = [], originalMessage = "") =>
     "language-purity": "แก้ปัญหาภาษาโดยแปลข้อความที่มีอักษรจีน ญี่ปุ่น หรือเกาหลีให้เป็นภาษาไทยหรือศัพท์ D&D ภาษาอังกฤษที่จำเป็น คงความหมายและข้อเท็จจริงเดิมไว้ ห้ามตอบเป็นภาษาอังกฤษทั้งประโยค",
     "cjk-leak": "แปลหรือลบอักษรจีน ญี่ปุ่น หรือเกาหลีที่หลุดมาให้เป็นภาษาไทยหรือศัพท์ D&D ภาษาอังกฤษที่จำเป็น คงความหมายเดิมและห้ามมีอักษรเหล่านั้นในคำตอบสุดท้าย",
     "ooc-ignored": "ร่างนี้เพิกเฉยคำถามนอกเกมของผู้เล่น ให้เพิ่มคำตอบตรงๆ สั้นๆ ต่อคำถามนั้นไว้ตอนต้นของคำตอบ ห้ามลบการบรรยายเดิมออก และค่อยกลับเข้าเรื่องหลังตอบคำถามแล้ว",
+    "narrative-loop": `ร่างนี้ซ้ำรูปแบบการตอบที่เคยใช้ไปแล้วในบทสนทนาก่อนหน้า (เช่น "เวลาหยุด", "เห็นภาพนิมิต", ประโยคซ้ำแบบเดิม) ห้ามใช้ลวดลายเดิมซ้ำอีก เขียนใหม่ให้การกระทำของผู้เล่นครั้งนี้ส่งผลจริงที่ต่างจากเดิม เช่น ขอ Attack Roll จริงถ้าเป็นการโจมตี, ให้เกิดผลลัพธ์ที่เปลี่ยนสถานะของฉากอย่างชัดเจน, หรือให้ตัวละคร/เหตุการณ์อื่นเข้ามาขัดจังหวะ ห้ามใช้มุก "หยุดเวลา" หรือ "เห็นภาพนิมิตแล้วจบ" ซ้ำอีกไม่ว่ากรณีใด`,
+    "unprovided-player-roll": "ร่างนี้แต่งผลการทอยของตัวละครผู้เล่นขึ้นเอง ทั้งที่ผู้เล่นยังไม่ได้ส่งผลทอยมา เขียนใหม่โดยห้ามสร้างหรือคาดเดาผล d20, modifier, total หรือผลสำเร็จ/ล้มเหลว ให้ระบุการทอยที่ต้องใช้และหยุดรอผลจากผู้เล่น",
+    "attack-roll-protocol": "ผู้เล่นประกาศโจมตีแต่ยังไม่ได้รายงานผลทอย ให้ขอ Attack Roll (d20 + modifier) แล้วหยุดรอ ห้ามบรรยายผลการโจมตีหรือผลตอบโต้ที่เกิดจากการโจมตีนั้น และห้ามแต่งผลทอย DM เป็นผู้กำหนด AC ของเป้าหมายเอง (จะเปิดเผยหรือซ่อนไว้ก็ได้) ไม่ใช่ให้ผู้เล่นตั้ง DC/AC",
   };
   const instructions = reasons.map((reason) => reasonInstructions[reason]).filter(Boolean).join("\n\n");
   return callAI([
@@ -366,6 +406,7 @@ const talkToDm = async (req, res, next) => {
       Message.find({ campaign: campaign._id }).sort({ createdAt: 1 }),
       findMentionedEntities(message.trim()),
     ]);
+    const recentDmMessages = allMessages.filter((item) => item.role === "dm").slice(-3);
     const srdFromLastDmTurn = campaign.context?.pendingSrdReference || null;
     const srdReference = [srdFromPlayerMessage, srdFromLastDmTurn].filter(Boolean).join("\n\n") || null;
     const oocReminder = looksLikeOocQuestion(message.trim())
@@ -392,15 +433,33 @@ const talkToDm = async (req, res, next) => {
     const conversation = contextManager.buildMessages(systemContent, recentMessages, message.trim());
     const dmResult = await callDmWithStateTools(conversation, contextManager);
     let answer = dmResult.answer;
+    const attackNeedsRoll = isPlayerAttackAction(message.trim()) && !hasPlayerReportedRoll(message.trim(), recentDmMessages);
     const repairReasons = [
       violatesPlayerAgency(answer) && "player-agency",
       violatesLanguagePurity(answer) && "language-purity",
       containsCjk(answer) && "cjk-leak",
       oocIgnored(message.trim(), answer, characters) && "ooc-ignored",
+      isNarrativeLoop(answer, recentDmMessages) && "narrative-loop",
+      claimsUnprovidedRoll(answer, message.trim(), recentDmMessages) && "unprovided-player-roll",
+      attackNeedsRoll && (!asksPlayerForAttackRoll(answer) || asksPlayerToSetDc(answer) || claimsPlayerAttackResolved(answer)) && "attack-roll-protocol",
     ].filter(Boolean);
     if (repairReasons.length) {
       console.log(`[repair] triggered: ${repairReasons.join(",")}`);
       answer = await repairPlayerAgency(answer, repairReasons, message.trim());
+    }
+    if (isNarrativeLoop(answer, recentDmMessages)) {
+      console.log("[repair] triggered: narrative-loop (retry)");
+      answer = await repairPlayerAgency(answer, ["narrative-loop"], message.trim());
+      if (isNarrativeLoop(answer, recentDmMessages)) {
+        console.warn("[repair] narrative-loop exhausted retries, using fallback");
+        answer = attackNeedsRoll ? diceSafetyFallback(message.trim()) : NARRATIVE_LOOP_FALLBACK;
+      }
+    }
+    if (
+      claimsUnprovidedRoll(answer, message.trim(), recentDmMessages)
+      || attackNeedsRoll && (!asksPlayerForAttackRoll(answer) || asksPlayerToSetDc(answer) || claimsPlayerAttackResolved(answer))
+    ) {
+      answer = diceSafetyFallback(message.trim());
     }
     const playerMessage = await Message.create({ campaign: campaign._id, author: req.user._id, role: "player", content: message.trim() });
     const dmMessage = await Message.create({ campaign: campaign._id, role: "dm", content: answer });

@@ -250,6 +250,7 @@ function ChatRpgDashboard({ session, campaigns, setCampaigns, selected, setSelec
       });
     } catch (err) {
       setSelected((current) => current && { ...current, messages: current.messages.filter((item) => item._id !== optimisticId) });
+      setMessage(outgoingMessage);
       setError(err.message);
     } finally {
       setLoading(false);

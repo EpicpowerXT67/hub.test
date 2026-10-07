@@ -29,15 +29,14 @@ const isAllowedOrigin = (origin) => {
   if (!origin) return true;
 
   try {
-    const { hostname, port } = new URL(origin);
+    const { hostname, port, protocol } = new URL(origin);
     const localHosts = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
     const isLocalHost = localHosts.has(hostname);
     const isLocalNetwork = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(hostname);
-    const isVercelDomain = hostname.endsWith(".vercel.app");
-    const isVercelPreview = hostname.includes("-git-") || hostname.includes("-preview-") || hostname.includes("-local");
+    const isVercelDomain = protocol === "https:" && (hostname === "vercel.app" || hostname.endsWith(".vercel.app"));
     const allowedPort = ["5173", "5174", "5175", "4173", "3000", "8080"].includes(port) || !port;
 
-    return allowedOrigins.includes(origin) || (isLocalHost || isLocalNetwork) && allowedPort || isVercelDomain || isVercelPreview;
+    return allowedOrigins.includes(origin) || (isLocalHost || isLocalNetwork) && allowedPort || isVercelDomain;
   } catch {
     return false;
   }
