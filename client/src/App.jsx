@@ -263,7 +263,18 @@ function ChatRpgDashboard({ session, campaigns, setCampaigns, selected, setSelec
       <div className="chat-sidebar-inner">
         <div className="chat-side-top"><b>⚄ Adventure Journey</b><button onClick={() => setSidebarOpen(false)} title="Hide sidebar">◧</button></div>
         <button className="new-table" onClick={toggleNewCampaignForm}>＋ New campaign</button>
-        <section className="side-section"><button className="side-section-title" onClick={() => setCampaignsOpen((open) => !open)}>⌄</button>{campaignsOpen && <>
+        <section className="side-section" id="campaign-list-section">{campaigns.length > 0 && <button
+          className="side-section-title campaigns-toggle"
+          type="button"
+          aria-expanded={campaignsOpen}
+          aria-controls="campaign-list-section"
+          onClick={() => setCampaignsOpen((open) => !open)}
+        >
+          <svg className={`campaign-chevron ${campaignsOpen ? "open" : ""}`} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>CAMPAIGNS</span>
+        </button>}{campaignsOpen && <>
           {showNewCampaignForm && (
             <div className="new-campaign-form">
               <form onSubmit={createCampaign} className="chat-campaign-form">
@@ -276,7 +287,17 @@ function ChatRpgDashboard({ session, campaigns, setCampaigns, selected, setSelec
           <div className="chat-campaign-list">{campaigns.map((campaign) => <button key={campaign._id} onClick={() => openCampaign(campaign._id)} className={selected?.campaign._id === campaign._id ? "active" : ""}><b>{campaign.name}</b><small>{campaign.settings.system}</small></button>)}</div>
         </>}</section>
         <div className="section-divider" aria-hidden="true" />
-        <section className="side-section sheets-section"><button className="side-section-title" onClick={() => setSheetsOpen((open) => !open)}>⌄ <span>CHARACTER SHEETS</span></button>{sheetsOpen && (selected ? <><form onSubmit={addCharacter} className="chat-character-add"><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Character name" /><button>+</button></form><label className="chat-file-picker">⌑ {file ? file.name : "Upload character sheet"}<input ref={sheetFileInput} type="file" accept=".pdf,.txt,.json" onChange={(event) => setFile(event.target.files?.[0])} /></label><div className="chat-character-list">{selected.characters.map((character) => <div key={character._id}><b>{character.name}</b><small>Lv. {character.level} · {character.className}</small>{character.sheet?.summary ? <em>Sheet read</em> : <button type="button" disabled={uploading} onClick={() => upload(character)}>{uploading ? "Reading…" : file ? "Read sheet" : "Choose & read sheet"}</button>}</div>)}</div></> : <p className="sidebar-hint">Select a campaign to see its party.</p>)}</section>
+        <section className="side-section sheets-section"><button
+          className="side-section-title sheets-toggle"
+          type="button"
+          aria-expanded={sheetsOpen}
+          onClick={() => setSheetsOpen((open) => !open)}
+        >
+          <svg className={`campaign-chevron ${sheetsOpen ? "open" : ""}`} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>CHARACTER SHEETS</span>
+        </button>{sheetsOpen && (selected ? <><form onSubmit={addCharacter} className="chat-character-add"><input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Character name" /><button>+</button></form><label className="chat-file-picker">⌑ {file ? file.name : "Upload character sheet"}<input ref={sheetFileInput} type="file" accept=".pdf,.txt,.json" onChange={(event) => setFile(event.target.files?.[0])} /></label><div className="chat-character-list">{selected.characters.map((character) => <div key={character._id}><b>{character.name}</b><small>Lv. {character.level} · {character.className}</small>{character.sheet?.summary ? <em>Sheet read</em> : <button type="button" disabled={uploading} onClick={() => upload(character)}>{uploading ? "Reading…" : file ? "Read sheet" : "Choose & read sheet"}</button>}</div>)}</div></> : <p className="sidebar-hint">Select a campaign to see its party.</p>)}</section>
         <div className="chat-user"><span>{session.user.name}</span><button onClick={logout}>Leave realm</button></div>
       </div>
     </aside>
